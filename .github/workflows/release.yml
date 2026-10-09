@@ -1,0 +1,194 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  prepare:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Verify tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ ! -f Cargo.lock ]; then
+            echo "Cargo.lock must be committed before publishing a release" >&2
+            exit 1
+          fi
+          package_version="$(python3 -c 'import tomllib; print(tomllib.load(open(\"Cargo.toml\", \"rb\"))[\"package\"][\"version\"])')"
+          if [ "$RELEASE_TAG" != "v$package_version" ]; then
+            echo "Tag $RELEASE_TAG does not match package version $package_version" >&2
+            exit 1
+          fi
+
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --verify-tag \
+              --generate-notes \
+              --title "Floresta Desktop $RELEASE_TAG"
+          fi
+
+  build:
+    name: Build ${{ matrix.artifact }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: linux-x86_64
+          - os: macos-latest
+            artifact: macos
+          - os: windows-latest
+            artifact: windows-x86_64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust 1.85.0
+        run: |
+          rustup toolchain install 1.85.0 --profile minimal --no-self-update
+          rustup default 1.85.0
+
+      - name: Install native dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            cmake \
+            libboost-all-dev \
+            libgl1-mesa-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libxrandr-dev \
+            pkg-config
+
+      - name: Install Boost (macOS)
+        if: runner.os == 'macOS'
+        run: brew install boost
+
+      - name: Install Boost (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
+          & "$env:RUNNER_TEMP\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          & "$env:RUNNER_TEMP\vcpkg\vcpkg.exe" install boost-multi-index:x64-windows-static boost-headers:x64-windows-static
+          "VCPKG_ROOT=$env:RUNNER_TEMP\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BOOST_ROOT=$env:RUNNER_TEMP\vcpkg\installed\x64-windows-static" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BOOST_INCLUDEDIR=$env:RUNNER_TEMP\vcpkg\installed\x64-windows-static\include" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BOOST_LIBRARYDIR=$env:RUNNER_TEMP\vcpkg\installed\x64-windows-static\lib" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+
+      - name: Build optimized binary
+        run: cargo build --locked --release
+
+      - name: Package and upload Linux binary
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          ARTIFACT_SUFFIX: ${{ matrix.artifact }}
+        run: |
+          staging="floresta-desktop-${RELEASE_TAG}-${ARTIFACT_SUFFIX}"
+          archive="${staging}.tar.gz"
+          mkdir "$staging"
+          cp target/release/floresta-desktop LICENSE-MIT LICENSE-APACHE "$staging/"
+          tar -czf "$archive" "$staging"
+          sha256sum "$archive" > "$archive.sha256"
+          gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Package and upload macOS binary
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          ARTIFACT_SUFFIX: ${{ matrix.artifact }}
+        run: |
+          staging="floresta-desktop-${RELEASE_TAG}-${ARTIFACT_SUFFIX}"
+          archive="${staging}.tar.gz"
+          mkdir "$staging"
+          cp target/release/floresta-desktop LICENSE-MIT LICENSE-APACHE "$staging/"
+          tar -czf "$archive" "$staging"
+          shasum -a 256 "$archive" > "$archive.sha256"
+          gh release upload "$RELEASE_TAG" "$archive" "$archive.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Package and upload Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          ARTIFACT_SUFFIX: ${{ matrix.artifact }}
+        run: |
+          $staging = "floresta-desktop-$env:RELEASE_TAG-$env:ARTIFACT_SUFFIX"
+          $archive = "$staging.zip"
+          New-Item -ItemType Directory -Path $staging
+          Copy-Item "target\release\floresta-desktop.exe", "LICENSE-MIT", "LICENSE-APACHE" -Destination $staging
+          Compress-Archive -Path $staging -DestinationPath $archive
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLower()
+          "$hash  $archive" | Set-Content -Encoding ascii "$archive.sha256"
+          gh release upload "$env:RELEASE_TAG" $archive "$archive.sha256" --repo "$env:GITHUB_REPOSITORY" --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to upload release artifacts"
+          }
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false

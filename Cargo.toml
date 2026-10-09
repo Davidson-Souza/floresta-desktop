@@ -1,0 +1,34 @@
+[package]
+name = "floresta-desktop"
+version = "0.1.0"
+rust-version = "1.85.0"
+edition = "2024"
+resolver = "2"
+authors = ["Floresta Developers <contact@getfloresta.org>"]
+license = "MIT OR Apache-2.0"
+description = "A friendly, cross-platform desktop application for Floresta"
+repository = "https://github.com/getfloresta/floresta-desktop"
+
+[dependencies]
+bitcoin = { version = "=0.32.8", default-features = false }
+dirs = { version = "=6.0.0", default-features = false }
+eframe = { version = "=0.31.1", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
+floresta-node = { git = "https://github.com/getfloresta/floresta", default-features = false, features = ["json-rpc"] }
+floresta-rpc = { git = "https://github.com/getfloresta/floresta", default-features = false, features = ["with-jsonrpc"] }
+rfd = { version = "=0.14.1", default-features = false, features = ["async-std", "xdg-portal"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150" }
+tokio = { version = "=1.52.3", features = ["net", "time", "rt-multi-thread", "signal", "macros"] }
+
+[dev-dependencies]
+tempfile = { version = "=3.27.0" }
+
+[lints.clippy]
+unused_async = "deny"
+use_self = "deny"
+
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+codegen-units = 1

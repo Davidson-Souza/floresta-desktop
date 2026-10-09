@@ -1,0 +1,6 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0009", # time 0.3.45 is the last release supporting the Rust 1.85 MSRV.
+    "RUSTSEC-2026-0194", # AccessKit uses it in macros to parse bundled AT-SPI interface files.
+    "RUSTSEC-2026-0195", # AccessKit uses it in macros to parse bundled AT-SPI interface files.
+]
