@@ -39,7 +39,7 @@ jobs:
             echo "Cargo.lock must be committed before publishing a release" >&2
             exit 1
           fi
-          package_version="$(python3 -c 'import tomllib; print(tomllib.load(open(\"Cargo.toml\", \"rb\"))[\"package\"][\"version\"])')"
+          package_version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
           if [ "$RELEASE_TAG" != "v$package_version" ]; then
             echo "Tag $RELEASE_TAG does not match package version $package_version" >&2
             exit 1

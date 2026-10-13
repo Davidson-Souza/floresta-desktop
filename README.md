@@ -28,6 +28,8 @@ Floresta Desktop embeds the node, guides you through configuration, and keeps sy
 
 Prebuilt archives for Linux x86-64, macOS, and Windows x86-64 are attached to each [GitHub release](https://github.com/getfloresta/floresta-desktop/releases). Download the archive for your platform, verify it against the accompanying `.sha256` file, extract it, and launch `floresta-desktop` (`floresta-desktop.exe` on Windows).
 
+Release publishing requires a committed `Cargo.lock` and a tag matching `v` followed by the `[package].version` in `Cargo.toml` (for example, `v0.1.0`).
+
 ### Build from source
 
 Requirements:
