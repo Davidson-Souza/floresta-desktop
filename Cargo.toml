@@ -12,7 +12,7 @@ repository = "https://github.com/getfloresta/floresta-desktop"
 [dependencies]
 bitcoin = { version = "=0.32.8", default-features = false }
 dirs = { version = "=6.0.0", default-features = false }
-eframe = { version = "=0.31.1", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
+eframe = { version = "=0.32.3", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
 # Enable metric producers without floresta-node's public, fixed-port metrics server.
 floresta-chain = { git = "https://github.com/getfloresta/floresta", default-features = false, features = ["metrics"] }
 floresta-metrics = { git = "https://github.com/getfloresta/floresta", default-features = false }
@@ -20,7 +20,7 @@ floresta-node = { git = "https://github.com/getfloresta/floresta", default-featu
 floresta-rpc = { git = "https://github.com/getfloresta/floresta", default-features = false, features = ["with-jsonrpc"] }
 floresta-wire = { git = "https://github.com/getfloresta/floresta", default-features = false, features = ["metrics"] }
 reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "rustls-tls", "socks"] }
-rfd = { version = "=0.14.1", default-features = false, features = ["async-std", "xdg-portal"] }
+rfd = { version = "=0.16.0", default-features = false, features = ["async-std", "xdg-portal"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150" }
 tempfile = { version = "=3.27.0" }
