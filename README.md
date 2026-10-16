@@ -87,6 +87,28 @@ The setup assistant walks through five decisions:
 
 Configuration is saved locally. The default data directory is `~/.floresta`; non-Mainnet networks use a network-specific subdirectory.
 
+With Swift Sync enabled (the default), the app downloads missing hints before starting a Mainnet or Signet node. The default source is `https://utxohints.store/hints/{bitcoin,signet}`, and files are stored in the node's data directory:
+
+- Mainnet: `<data directory>/bitcoin.hints`
+- Signet: `<data directory>/signet/signet.hints`
+
+During the download, a centered startup status card displays which network's hints are being fetched. Startup indicators are static: node status changes wake the UI directly instead of continuously repainting an animation, keeping CPU usage low even with software rendering.
+
+Existing hints files are reused. Downloads use the configured Tor proxy when enabled and must finish before the node starts. Failed or cancelled downloads do not leave a partial hints file; download failures are shown as startup errors. Testnet4 and Regtest do not download hints.
+
+Under **Storage → Advanced sync settings**:
+
+- **Hints file origin (base URL)** changes the download source. The app appends `/bitcoin` or `/signet`; for example, `https://example.org/hints` serves `https://example.org/hints/signet`. HTTP and HTTPS base URLs are supported, without queries or fragments. Existing hints are reused, so changing the origin affects new downloads.
+- **Swift Sync** can be turned off to prevent all hints downloads. Existing `<network>.hints` files are renamed to `<network>.hints.disabled` before the node starts, preventing Floresta from using them. Turning Swift Sync back on restores the parked hints. If both filenames exist when disabling, startup reports an error instead of overwriting either file.
+
+Both settings are saved with the node configuration. Disabling Swift Sync does not change the separate Fast start or Background validation options.
+
+### Synchronization progress
+
+During initial block download, synchronization height, percentage, and remaining blocks use Floresta's Prometheus `block_height` gauge and the RPC header target. The app serves and polls metrics on a private, dynamically allocated loopback port; it does not expose the upstream public port 3333. Missing or invalid metrics are reported as a status error rather than silently showing stale chain progress.
+
+Swift Sync validates blocks before committing chain state. Its live sync height can therefore be ahead of the **Committed block** shown in sync details. The gauge records the latest processed height, not an exact count of completed blocks, so parallel processing can make progress fluctuate. Readiness still depends on the committed chain and RPC IBD state; after IBD, progress comes from RPC.
+
 ## Wallet and service model
 
 Floresta Desktop separates verification from key management:

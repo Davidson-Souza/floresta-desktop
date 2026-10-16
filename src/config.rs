@@ -118,6 +118,8 @@ pub struct NodeConfig {
     pub tor_proxy: String,
     pub fast_start: bool,
     pub backfill: bool,
+    pub swift_sync: bool,
+    pub hints_origin: String,
     pub wallets: Vec<WalletImport>,
     pub electrum_address: String,
     pub electrum_tls_enabled: bool,
@@ -141,6 +143,8 @@ impl Default for NodeConfig {
             tor_proxy: "127.0.0.1:9050".to_owned(),
             fast_start: false,
             backfill: true,
+            swift_sync: true,
+            hints_origin: "https://utxohints.store/hints".to_owned(),
             wallets: Vec::new(),
             electrum_address: "127.0.0.1:50001".to_owned(),
             electrum_tls_enabled: false,
@@ -182,6 +186,9 @@ impl NodeConfig {
 
     pub fn validate(&self) -> Result<(), String> {
         self.validate_data_dir()?;
+        if self.swift_sync {
+            self.hints_url()?;
+        }
 
         if self.use_tor {
             validate_endpoint("Tor proxy", &self.tor_proxy)?;
@@ -199,6 +206,26 @@ impl NodeConfig {
         }
 
         Ok(())
+    }
+
+    pub fn hints_url(&self) -> Result<reqwest::Url, String> {
+        let mut url = reqwest::Url::parse(self.hints_origin.trim())
+            .map_err(|_| "Hints file origin must be an absolute HTTP or HTTPS URL.".to_owned())?;
+        if !matches!(url.scheme(), "http" | "https")
+            || url.host_str().is_none()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return Err(
+                "Hints file origin must be an HTTP or HTTPS base URL without a query or fragment."
+                    .to_owned(),
+            );
+        }
+        url.path_segments_mut()
+            .map_err(|_| "Hints file origin cannot be used as a base URL.".to_owned())?
+            .pop_if_empty()
+            .push(self.network.slug());
+        Ok(url)
     }
 
     fn validate_data_dir(&self) -> Result<(), String> {

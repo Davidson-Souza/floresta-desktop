@@ -68,7 +68,7 @@ impl FlorestaApp {
             .dark_mode
             .unwrap_or_else(|| creation.egui_ctx.system_theme() == Some(egui::Theme::Dark));
         theme::apply(&creation.egui_ctx, dark_mode);
-        let controller = NodeController::new();
+        let controller = NodeController::new(creation.egui_ctx.clone());
         let setup = SetupState::new(persisted.config.clone().unwrap_or_default());
         let mut app = Self {
             config: persisted.config,
@@ -329,7 +329,7 @@ impl eframe::App for FlorestaApp {
             }
         }
 
-        if !matches!(self.lifecycle, Lifecycle::Setup) {
+        if !matches!(self.lifecycle, Lifecycle::Setup | Lifecycle::Starting(_)) {
             ctx.request_repaint_after(Duration::from_millis(500));
         }
     }

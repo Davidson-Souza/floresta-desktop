@@ -125,9 +125,11 @@ pub fn toggle(ui: &mut Ui, value: &mut bool) -> Response {
 pub fn toggle_setting(ui: &mut Ui, value: &mut bool, title: &str, description: &str) -> Response {
     let mut changed = None;
     ui.horizontal(|ui| {
+        let text_width = (ui.available_width() - 43.0 - ui.spacing().item_spacing.x).max(1.0);
         ui.vertical(|ui| {
+            ui.set_width(text_width);
             ui.label(RichText::new(title).color(theme::text()).strong());
-            ui.label(RichText::new(description).color(theme::text_muted()));
+            ui.add(egui::Label::new(RichText::new(description).color(theme::text_muted())).wrap());
         });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             changed = Some(toggle(ui, value));

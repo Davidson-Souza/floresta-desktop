@@ -344,7 +344,7 @@ fn overview(
             ui.label(
                 RichText::new(format!(
                     "Block {} of {}",
-                    format_number(snapshot.block_height),
+                    format_number(snapshot.sync_height),
                     format_number(snapshot.target_height)
                 ))
                 .color(theme::text_muted()),
@@ -542,8 +542,8 @@ fn sync_page(ui: &mut Ui, snapshot: &NodeSnapshot, config: &NodeConfig) -> Dashb
         ui.columns(3, |columns| {
             components::metric(
                 &mut columns[0],
-                format_number(snapshot.block_height),
-                "verified height",
+                format_number(snapshot.sync_height),
+                "sync height",
             );
             components::metric(
                 &mut columns[1],
@@ -564,7 +564,7 @@ fn sync_page(ui: &mut Ui, snapshot: &NodeSnapshot, config: &NodeConfig) -> Dashb
         ui.add_space(8.0);
         detail_row(ui, "Phase", snapshot.phase());
         detail_row(ui, "Network", &snapshot.chain);
-        detail_row(ui, "Latest block", &format_number(snapshot.block_height));
+        detail_row(ui, "Committed block", &format_number(snapshot.block_height));
         detail_row(ui, "Last block seen", &format_age(snapshot.last_block_time));
         detail_row(ui, "Chain state size", &format_bytes(snapshot.size_on_disk));
     });
@@ -1026,6 +1026,7 @@ mod tests {
         let snapshot = NodeSnapshot {
             chain: "regtest".to_owned(),
             block_height: 100,
+            sync_height: 100,
             target_height: 100,
             verification_progress: 1.0,
             initial_block_download: false,

@@ -101,7 +101,7 @@ pub fn show(
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                        ui.set_max_width(940.0);
+                        ui.set_max_width(ui.available_width().min(940.0));
                         ui.horizontal(|ui| {
                             components::brand(ui, false);
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -367,6 +367,28 @@ fn storage_step(ui: &mut Ui, state: &mut SetupState) {
     }
     if state.show_sync_advanced {
         components::muted_card(ui, |ui| {
+            components::toggle_setting(
+                ui,
+                &mut state.draft.swift_sync,
+                "Swift Sync",
+                "Use hints to speed up initial sync. Turn off to skip downloads and set existing hints aside.",
+            );
+            ui.add_enabled_ui(state.draft.swift_sync, |ui| {
+                labeled_text(
+                    ui,
+                    "Hints file origin (base URL)",
+                    &mut state.draft.hints_origin,
+                    "https://utxohints.store/hints",
+                );
+                ui.label(
+                    RichText::new("Adds /bitcoin or /signet. Existing hints are reused; this URL applies to new downloads.")
+                        .size(12.0)
+                        .color(theme::text_muted()),
+                );
+            });
+            ui.add_space(14.0);
+            components::divider(ui);
+            ui.add_space(14.0);
             components::toggle_setting(
                 ui,
                 &mut state.draft.fast_start,
@@ -647,6 +669,19 @@ fn review_step(ui: &mut Ui, state: &mut SetupState) {
                 "Full validation from genesis"
             },
         );
+        components::divider(ui);
+        review_row(
+            ui,
+            "Swift Sync",
+            if state.draft.swift_sync {
+                "Enabled"
+            } else {
+                "Disabled"
+            },
+        );
+        if state.draft.swift_sync {
+            review_row(ui, "Hints origin", &state.draft.hints_origin);
+        }
         components::divider(ui);
         review_row(
             ui,

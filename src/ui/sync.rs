@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use std::f32::consts::TAU;
 use std::time::Duration;
 
 use eframe::egui;
 use egui::Align;
-use egui::Color32;
 use egui::CornerRadius;
 use egui::Layout;
 use egui::RichText;
@@ -54,12 +52,12 @@ pub fn show(
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.with_layout(Layout::top_down(Align::Center), |ui| {
-                        ui.set_max_width(900.0);
+                        ui.set_max_width(ui.available_width().min(900.0));
                         top_bar(ui, ctx, config, dark_mode);
                         ui.add_space(42.0);
 
                         match status {
-                            SyncStatus::Starting(detail) => starting(ui, ctx, detail),
+                            SyncStatus::Starting(detail) => starting(ui, detail),
                             SyncStatus::Syncing(snapshot) => syncing(ui, config, snapshot),
                             SyncStatus::Ready(snapshot) => {
                                 action = ready(ui, config, snapshot);
@@ -99,8 +97,8 @@ fn top_bar(ui: &mut Ui, ctx: &egui::Context, config: &NodeConfig, dark_mode: &mu
     });
 }
 
-fn starting(ui: &mut Ui, ctx: &egui::Context, detail: &str) {
-    spinner(ui, ctx);
+fn starting(ui: &mut Ui, detail: &str) {
+    startup_mark(ui);
     ui.add_space(24.0);
     ui.label(
         RichText::new("Starting your node")
@@ -114,12 +112,25 @@ fn starting(ui: &mut Ui, ctx: &egui::Context, detail: &str) {
             .color(theme::text_muted()),
     );
     ui.add_space(24.0);
-    components::muted_card(ui, |ui| {
-        ui.horizontal(|ui| {
-            pulse_dot(ui, ctx);
-            ui.label(RichText::new(detail).color(theme::text()).strong());
-        });
-    });
+    let message_width = ui.available_width().min(480.0);
+    ui.allocate_ui_with_layout(
+        egui::vec2(message_width, 0.0),
+        Layout::top_down(Align::Min),
+        |ui| {
+            components::muted_card(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    let (dot, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
+                    ui.painter()
+                        .circle_filled(dot.center(), 4.0, theme::green());
+                    ui.add(
+                        egui::Label::new(RichText::new(detail).color(theme::text()).strong())
+                            .wrap(),
+                    );
+                });
+            });
+        },
+    );
     ui.add_space(18.0);
     ui.label(
         RichText::new("This normally takes a few moments. Your settings are already saved.")
@@ -152,7 +163,7 @@ fn syncing(ui: &mut Ui, config: &NodeConfig, snapshot: &NodeSnapshot) {
     ui.add_space(10.0);
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(format!("Block {}", format_number(snapshot.block_height)))
+            RichText::new(format!("Block {}", format_number(snapshot.sync_height)))
                 .color(theme::text())
                 .strong(),
         );
@@ -242,9 +253,11 @@ fn syncing(ui: &mut Ui, config: &NodeConfig, snapshot: &NodeSnapshot) {
                     .strong(),
             );
             ui.label(
-                RichText::new(
-                    "Progress is saved continuously. Closing the app pauses the node and resumes safely next time.",
-                )
+                RichText::new(if snapshot.sync_height > snapshot.block_height {
+                    "Swift Sync progress is live. Chain state is committed when Swift Sync finishes."
+                } else {
+                    "Progress is saved continuously. Closing the app pauses the node and resumes safely next time."
+                })
                 .color(theme::text_muted()),
             );
         });
@@ -380,31 +393,21 @@ fn sync_metric(ui: &mut Ui, title: &str, value: String, helper: &str) {
     });
 }
 
-fn spinner(ui: &mut Ui, ctx: &egui::Context) {
+fn startup_mark(ui: &mut Ui) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(72.0, 72.0), Sense::hover());
-    let time = ctx.input(|input| input.time) as f32;
-    let green = theme::green();
-    for index in 0..10 {
-        let phase = index as f32 / 10.0;
-        let angle = time * 2.2 + phase * TAU;
-        let center = rect.center() + egui::vec2(angle.cos(), angle.sin()) * 28.0;
-        let alpha = (55.0 + phase * 190.0) as u8;
-        ui.painter().circle_filled(
-            center,
-            3.5,
-            Color32::from_rgba_unmultiplied(green.r(), green.g(), green.b(), alpha),
-        );
-    }
-    ctx.request_repaint_after(Duration::from_millis(16));
-}
-
-fn pulse_dot(ui: &mut Ui, ctx: &egui::Context) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
-    let time = ctx.input(|input| input.time) as f32;
-    let radius = 4.0 + (time * 3.0).sin().abs() * 2.0;
+    let center = rect.center();
     ui.painter()
-        .circle_filled(rect.center(), radius, theme::green());
-    ctx.request_repaint_after(Duration::from_millis(32));
+        .circle_filled(center, 35.0, theme::green_pale());
+    ui.painter()
+        .circle_stroke(center, 34.0, Stroke::new(2.0_f32, theme::green()));
+    ui.painter().line_segment(
+        [center + egui::vec2(0.0, -18.0), center],
+        Stroke::new(3.0_f32, theme::green()),
+    );
+    ui.painter().line_segment(
+        [center, center + egui::vec2(13.0, 8.0)],
+        Stroke::new(3.0_f32, theme::green()),
+    );
 }
 
 fn success_mark(ui: &mut Ui) {
@@ -505,6 +508,7 @@ mod tests {
         let ready = NodeSnapshot {
             chain: "regtest".to_owned(),
             block_height: 100,
+            sync_height: 100,
             target_height: 100,
             verification_progress: 1.0,
             initial_block_download: false,
@@ -521,6 +525,7 @@ mod tests {
         };
         let mut syncing = ready.clone();
         syncing.block_height = 42;
+        syncing.sync_height = 42;
         syncing.initial_block_download = true;
         syncing.verification_progress = 0.42;
 
